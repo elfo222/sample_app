@@ -31,7 +31,7 @@ describe "User pages" do
 					fill_in "Name",			with: "Example User"
 					fill_in "Email",		with: "user@example.com"
 					fill_in "Password",		with: "foobar"
-					fill_in	"Confirmation", with: "foobar"
+					fill_in	"Confirm Password", with: "foobar"
 				end
 
 				it "should create a user" do
@@ -95,6 +95,18 @@ describe "User pages" do
 			specify { expect(user.reload.name).to eq new_name }
 			specify { expect(user.reload.email).to eq new_email }
 		end
+
+		describe "forbidden attributes" do
+			let(:params) do
+				{ user: { admin: true, password: user.password, password_confirmation: user.password } }
+			end
+
+			before do
+				signin user, no_capybara: true
+				patch user_path(user), params
+			end
+			specify { expect(user.reload).not_to be_admin }
+		end
 	end
 
 	describe "index" do
@@ -118,6 +130,31 @@ describe "User pages" do
 				User.paginate(page: 1).each do |user|
 					expect(page).to have_selector('li', text: user.name)
 				end
+			end
+		end
+
+		describe "delete links" do
+			
+			it "should not appear for regular users" do
+				should_not have_link('delete')
+			end
+
+			describe "as an admin" do
+				let(:admin) { FactoryGirl.create(:admin) }
+				before do
+					signin admin
+					visit users_path
+				end
+
+				it { should have_link('delete', href: user_path(User.first)) }
+				it "should be able to delete another user" do
+					expect do
+						click_link('delete', match: :first)
+						expect(page).to have_success_message
+					end.to change(User, :count).by(-1)
+				end
+
+				it { should_not have_link('delete', href: user_path(admin)) }
 			end
 		end
 	end
